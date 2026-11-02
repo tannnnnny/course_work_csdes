@@ -1,5 +1,3 @@
-"""Верифікація моделі: варіювання вхідних змінних і перевірка логічності реакції виходів."""
-
 from __future__ import annotations
 
 from ..params import Params
@@ -25,7 +23,7 @@ SCENARIOS = [
      "завантаження роботів ↑, час проходження ↑"),
     ("детерміновані часи, exp→const(300)", {"arrival": const(300.0), "m1_time": const(60.0),
                                             "m2_time": const(100.0), "handling": const(8.0)},
-     "перша деталь 226 с, решта 244 с (226 + холості ходи 6+7+5)"),
+     "варіант 1: кожна деталь 226 с; варіант 2: 226, 232, 239 с, далі 244 с (226 + холостий хід W -> A)"),
 ]
 
 COLUMNS = ["throughput_per_hour", "sojourn_mean", "buffer_max", "buffer_mean",
@@ -34,7 +32,6 @@ INPUT_COLUMNS = ["in_arrival", "in_m1", "in_m2", "in_handling", "in_m2_capacity"
 
 
 def inputs_of(p: Params, travel: float) -> dict:
-    """Значення вхідних змінних прогону для таблиці верифікації."""
     return {"in_arrival": str(p.arrival), "in_m1": str(p.m1_time), "in_m2": str(p.m2_time),
             "in_handling": str(p.handling), "in_m2_capacity": p.m2_capacity, "in_travel": f"×{travel:g}"}
 

@@ -1,5 +1,3 @@
-"""Графіки за збереженими результатами експериментів."""
-
 from __future__ import annotations
 
 import csv
@@ -9,9 +7,9 @@ from pathlib import Path
 import matplotlib
 
 matplotlib.use("Agg")
-import matplotlib.pyplot as plt  # noqa: E402
-import numpy as np  # noqa: E402
-from scipy import stats  # noqa: E402
+import matplotlib.pyplot as plt  
+import numpy as np  
+from scipy import stats  
 
 SURFACE = "#fcfcfb"
 INK = "#0b0b0b"
@@ -72,7 +70,6 @@ def plot_distribution(results: Path, tag: str, top: int = 3, out: Path | None = 
     xs = np.linspace(max(0.0, edges[0] - width), edges[-1] + width, 600)
     for i, fit in enumerate(fits[:top]):
         dist = SCIPY_DIST[fit["law"]]
-        # щільність, приведена до ймовірності потрапляння в інтервал ширини width
         ys = dist.pdf(xs, *fit["params_raw"]) * width
         verdict = "прийнято" if fit["accepted"] else "відхилено"
         label = (f"{LAW_UA.get(fit['law'], fit['law'])}: χ² = {fit['chi2']:.1f}, "

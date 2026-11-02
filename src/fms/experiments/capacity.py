@@ -4,7 +4,7 @@ from ..params import Params
 from ..rng import exp
 from .common import run_batch, summarize, variants
 
-DEFAULT_ARRIVALS = (34, 36, 38, 40, 42, 44, 45, 46, 47, 48, 49, 50, 52, 55, 60, 70, 80)
+DEFAULT_ARRIVALS = (34, 36, 38, 40, 41, 42, 43, 44, 45, 46, 47, 48, 49, 50, 52, 55, 60, 70, 80)
 RESPONSES = ("throughput_per_hour", "sojourn_mean", "buffer_max", "buffer_mean", "buffer_q99",
              "wip_end", "M1_occupied", "M2_occupied", "M2_processing", "M2_blocked", "robots_util_mean",
              "robot1_util", "robot2_util", "robot3_util")
@@ -32,7 +32,6 @@ def run(arrivals, strategy, reps: int, t_end: float, t_warmup: float, jobs: int,
 
 
 def max_stable(rows: list[dict]) -> list[dict]:
-    """Найбільша інтенсивність надходження, за якої режим ще стійкий, і максимальний вихідний потік."""
     out = {}
     for r in rows:
         key = r["strategy"]

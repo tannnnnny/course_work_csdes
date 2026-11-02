@@ -9,6 +9,7 @@ SCENARIOS = [
     ("4-й робот на маршруті 1 (A → M1)", {"n_robots": 4}, {"dedicated_routes": (1, 2, 3, 1)}),
     ("4-й робот на маршруті 2 (M1 → M2)", {"n_robots": 4}, {"dedicated_routes": (1, 2, 3, 2)}),
     ("4-й робот на маршруті 3 (M2 → W)", {"n_robots": 4}, {"dedicated_routes": (1, 2, 3, 3)}),
+    # у варіанті 1 4-й робот у комбінації – на маршруті 2, бо окремо він дає найбільший приріст
     ("4 місця на M2 і 4-й робот на маршруті 2", {"m2_capacity": 4, "n_robots": 4},
      {"dedicated_routes": (1, 2, 3, 2)}),
 ]
@@ -25,6 +26,7 @@ def run(reps: int, t_end: float, t_warmup: float, jobs: int, base: Params | None
         for strategy in (DEDICATED, NEAREST):
             params = base.with_(strategy=strategy, **change,
                                 **(dedicated_change if strategy == DEDICATED else {}))
+            # у варіанті 2 маршрут 4-го робота не задається: три сценарії з ним однакові
             key = (strategy, params.m2_capacity, params.n_robots, params.dedicated_routes)
             if key in seen:
                 continue

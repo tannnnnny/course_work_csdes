@@ -50,7 +50,6 @@ def chi_square(data: np.ndarray, dist, params: tuple, n_params: int, bins: int) 
 
 
 def gamma_shifted_moments(data: np.ndarray) -> tuple[float, float, float]:
-    """Оцінки зсунутого гамма-закону за методом моментів: асиметрія 2/√k, σ² = kθ², μ = c + kθ."""
     mean, std = float(data.mean()), float(data.std(ddof=1))
     skew = max(float(stats.skew(data)), 1e-3)
     k = (2.0 / skew) ** 2

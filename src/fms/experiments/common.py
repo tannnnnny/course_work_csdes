@@ -1,5 +1,3 @@
-"""Спільні засоби для експериментів: серії прогонів, збереження результатів, статистика."""
-
 from __future__ import annotations
 
 import csv
@@ -14,7 +12,6 @@ from scipy import stats
 from ..model import simulate
 from ..params import DEDICATED, NEAREST, Params
 
-# основні відгуки моделі
 KEY_OUTPUTS = (
     "throughput_per_hour", "sojourn_mean", "buffer_max", "buffer_mean",
     "M1_occupied", "M1_processing", "M1_blocked", "M2_occupied", "M2_processing", "M2_blocked",
@@ -26,7 +23,6 @@ STRATEGY_LABEL = {DEDICATED: "1) закріплені", NEAREST: "2) найбл�
 
 
 def variants(strategy: str | None) -> list[str]:
-    """Обраний спосіб закріплення роботів або обидва."""
     return [strategy] if strategy else [DEDICATED, NEAREST]
 
 
@@ -37,7 +33,6 @@ def _one(args):
 
 
 def run_batch(tasks: list[tuple], jobs: int = 1) -> list[tuple[dict, list[float] | None]]:
-    """Виконати набір прогонів (params, seed, t_end, t_warmup, keep_sojourn), за потреби паралельно."""
     if jobs > 1 and len(tasks) > 1:
         with ProcessPoolExecutor(max_workers=jobs) as ex:
             return list(ex.map(_one, tasks, chunksize=max(1, len(tasks) // (4 * jobs))))
@@ -46,10 +41,7 @@ def run_batch(tasks: list[tuple], jobs: int = 1) -> list[tuple[dict, list[float]
 
 def replicate(params: Params, n: int, t_end: float, t_warmup: float,
               seed0: int = 1, jobs: int = 1, keep_sojourn: bool = False):
-    """n повторних прогонів з зернами seed0..seed0+n-1.
 
-    Однакові зерна для різних варіантів дають спільні випадкові числа.
-    """
     tasks = [(params, seed0 + i, t_end, t_warmup, keep_sojourn) for i in range(n)]
     out = run_batch(tasks, jobs)
     results = [r for r, _ in out]
@@ -58,7 +50,6 @@ def replicate(params: Params, n: int, t_end: float, t_warmup: float,
 
 
 def summarize(values, beta: float = 0.95) -> dict:
-    """Середнє, стандартне відхилення та довірчий інтервал (Стьюдент)."""
     x = np.asarray([v for v in values if not (isinstance(v, float) and math.isnan(v))], dtype=float)
     n = len(x)
     if n == 0:

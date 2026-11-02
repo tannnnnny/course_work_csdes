@@ -1,5 +1,3 @@
-"""Генератори випадкових чисел."""
-
 from __future__ import annotations
 
 import math
@@ -8,11 +6,13 @@ from dataclasses import dataclass
 
 
 class Stream:
+
     def __init__(self, seed: int | str):
         self._rnd = random.Random(seed)
         self._spare_normal: float | None = None
 
     def zeta(self) -> float:
+        """Рівномірна величина на (0, 1]."""
         return 1.0 - self._rnd.random()
 
     def exponential(self, mean: float) -> float:
@@ -44,6 +44,9 @@ class Stream:
 
     def random(self) -> float:
         return self._rnd.random()
+
+    def choice(self, items: list):
+        return items[0] if len(items) == 1 else self._rnd.choice(items)
 
 
 @dataclass(frozen=True)

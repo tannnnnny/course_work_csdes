@@ -1,5 +1,3 @@
-"""Визначення кількості повторних прогонів."""
-
 from __future__ import annotations
 
 import math

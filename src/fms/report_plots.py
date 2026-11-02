@@ -99,7 +99,6 @@ def _save(fig, out: Path) -> Path:
 
 
 def plot_capacity(results: Path, out: Path) -> Path:
-    """Пропускна здатність залежно від інтенсивності надходження (межа стійкості)."""
     rows = _read(results / "capacity.csv")
     limits = {r["strategy"]: r for r in _read(results / "capacity_limits.csv")}
     fig, ax = plt.subplots(figsize=(WIDTH, 8.5 * CM))
@@ -126,7 +125,6 @@ def plot_capacity(results: Path, out: Path) -> Path:
                     arrowprops={"arrowstyle": "-", "color": MUTED, "linewidth": 0.8, "shrinkA": 2, "shrinkB": 3})
     ax.set_xlim(lo, hi + 9)
     ax.set_ylim(40, 90)
-    # підпис уздовж діагоналі «вихід = вхід» (кут лінії на екрані)
     (x1, y1), (x2, y2) = ax.transData.transform([(80, 80), (90, 90)])
     angle = np.degrees(np.arctan2(y2 - y1, x2 - x1))
     ax.text(84.2, 85.4, "вихід = вхід", color=INK_2, fontsize=8, rotation=angle, rotation_mode="anchor",
@@ -146,7 +144,6 @@ def _series(results: Path, tag: str):
 
 
 def plot_queue_growth(results: Path, out: Path, tag: str = "a40") -> Path:
-    """Кількість деталей на площадці A з плином часу при перевантаженні."""
     data = _series(results, tag)
     fig, ax = plt.subplots(figsize=(WIDTH, 7.5 * CM))
     for s in STRATEGIES:
@@ -172,7 +169,6 @@ def plot_queue_growth(results: Path, out: Path, tag: str = "a40") -> Path:
 
 def plot_warmup(results: Path, out: Path, tag: str, metric: str, ylabel: str, xscale: float = 1000.0,
                 xlabel: str = "Модельний час, тис. с", digits: int = 1) -> Path:
-    """Середнє значення відгуку на [0; t] для 5 прогонів і момент T за умовою (3.1)."""
     data = _series(results, tag)
     summary = {(r["strategy"], r["metric"]): r for r in _read(results / f"warmup_summary_{tag}.csv")}
     fig, axes = plt.subplots(1, 2, figsize=(WIDTH, 7.2 * CM), sharey=True)
@@ -188,7 +184,7 @@ def plot_warmup(results: Path, out: Path, tag: str, metric: str, ylabel: str, xs
             tmax = max(tmax, t[-1])
             ax.plot(t, y, color=st["color"], linewidth=0.9, alpha=0.85)
         ax.axhspan(level - eps, level + eps, color=MUTED, alpha=0.18, linewidth=0,
-                   label=f"рівень ± ε (ε = 5 %)")
+                   label="рівень ± ε (ε = 5%)")
         if not np.isnan(T):
             ax.axvline(T / xscale, color=INK_2, linewidth=1.0, label="момент T за (3.1)")
             ax.annotate(f"T = {num(T / xscale, 0 if T / xscale >= 10 else 1)}", xy=(T / xscale, 1.0),
@@ -216,7 +212,6 @@ def _bar_labels(ax, bars, values, digits=2, inside=False):
 
 
 def plot_utilization(results: Path, out: Path, tag: str = "a40") -> Path:
-    """Коефіцієнти використання роботів і верстатів для двох варіантів."""
     summary = {r["strategy"]: r for r in _read(results / f"compare_{tag}_summary.csv")}
     keys = [("robot1_util", "Робот R1"), ("robot2_util", "Робот R2"), ("robot3_util", "Робот R3"),
             ("M1_occupied", "Верстат M1"), ("M2_occupied", "Верстат M2")]
@@ -247,12 +242,12 @@ def _darker(hex_color: str, factor: float = 0.72) -> str:
     return "#{:02x}{:02x}{:02x}".format(*(int(c * factor) for c in (r, g, b)))
 
 
-PHASES = [("empty_move", "холостий хід"), ("grab", "захоплення"), ("loaded_move", "переміщення з деталлю"),
-          ("wait_slot", "очікування місця з деталлю"), ("release", "вивільнення")]
+PHASES = [("empty_move", "холостий хід, повернення"), ("grab", "захоплення"),
+          ("loaded_move", "переміщення з деталлю"), ("wait_slot", "блокування: робот тримає деталь"),
+          ("release", "вивільнення")]
 
 
 def plot_robot_phases(results: Path, out: Path, tag: str = "a40") -> Path:
-    """Структура часу роботи кожного робота (частки фаз обслуговування)."""
     raw = _read(results / f"compare_{tag}_raw.csv")
     rows = []
     for s in STRATEGIES:
@@ -271,14 +266,14 @@ def plot_robot_phases(results: Path, out: Path, tag: str = "a40") -> Path:
                     label=name if yy == y[0] else None, zorder=2)
             if v >= 0.07:
                 txt_color = INK if color == SLOTS[3] else "#ffffff"
-                ax.text(left + v * 50, yy, f"{v * 100:.0f} %", ha="center", va="center", fontsize=7.5,
+                ax.text(left + v * 50, yy, f"{v * 100:.0f}%", ha="center", va="center", fontsize=7.5,
                         color=txt_color, zorder=3)
             left += v * 100
         free = 100 - left
         ax.barh(yy, free, left=left, height=0.62, color=FREE_FILL, edgecolor=SURFACE, linewidth=1.2,
                 label="вільний" if yy == y[0] else None, zorder=2)
         if free >= 7:
-            ax.text(left + free / 2, yy, f"{free:.0f} %", ha="center", va="center", fontsize=7.5, color=INK)
+            ax.text(left + free / 2, yy, f"{free:.0f}%", ha="center", va="center", fontsize=7.5, color=INK)
     ax.set_yticks(y, [r[0] for r in rows])
     ax.set_xlim(0, 100)
     ax.set_xlabel("Частка часу моделювання, %")
@@ -305,7 +300,6 @@ CURVE_STYLES = [(SLOTS[1], "-"), (SLOTS[2], "--"), ("#6250d6", ":")]
 
 
 def plot_distribution(results: Path, out: Path, strategy: str, tag: str = "a60", top: int = 3) -> Path:
-    """Гістограма відносних частот часу проходження і щільності найкращих законів."""
     name = f"{strategy}_{tag}"
     data = np.loadtxt(results / f"dist_data_{name}.txt")
     hist = _read(results / f"dist_hist_{name}.csv")
@@ -335,7 +329,6 @@ def plot_distribution(results: Path, out: Path, strategy: str, tag: str = "a60",
 
 
 def plot_improvement(results: Path, out: Path, tag: str = "a40") -> Path:
-    """Пропускна здатність для пропозицій щодо поліпшення (пробні запуски)."""
     rows = _read(results / f"improvement_{tag}.csv")
     groups = {s: [r for r in rows if r["strategy"] == s] for s in STRATEGIES}
     heights = [len(groups[s]) for s in STRATEGIES]

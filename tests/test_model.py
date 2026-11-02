@@ -2,7 +2,7 @@ import math
 
 import pytest
 
-from fms.elements import FREE, R_FREE, R_WAIT
+from fms.elements import BLOCKED, BUSY, FREE
 from fms.model import Model, simulate
 from fms.params import DEDICATED, NEAREST, Params
 from fms.rng import Stream, const, exp, norm, unif
@@ -24,10 +24,7 @@ def test_single_part_time_is_exact(strategy):
 
 
 @pytest.mark.parametrize("strategy,expected", [
-    # варіант 1: кожен робот повертається своїм маршрутом, холості ходи 6 + 7 + 5 = 18 с
-    (DEDICATED, [226.0] + [244.0] * 9),
-    # варіант 2: спершу роботи стоять ближче до точок завантаження, далі всі збираються на складі,
-    # і деталь перевозить один робот: холостий хід W -> A 18 с, решта перевезень без холостого ходу
+    (DEDICATED, [226.0] * 10),
     (NEAREST, [226.0, 232.0, 239.0] + [244.0] * 7),
 ])
 def test_deterministic_sojourn_sequence(strategy, expected):
@@ -35,12 +32,11 @@ def test_deterministic_sojourn_sequence(strategy, expected):
     assert m.sojourn_times() == [pytest.approx(x) for x in expected]
 
 
-def test_second_part_includes_empty_return():
-    # робот 1 після доставки стоїть у M1 і повертається до A порожнім (6 с)
-    # деталь 2 надходить о 60, робот 1 звільнився о 30+22=52 у M1 -> холостий хід 6
-    m = Model(deterministic(arrival=const(30.0)), seed=1, trace=True).run(400)
+def test_dedicated_robot_is_released_after_return():
+    # робот R1: захоплення 8 + хід 6, після переходу деталі на M1 – вивільнення 8 + повернення 6
+    m = Model(deterministic(), seed=1, trace=True).run(1100)
     lines = "\n".join(m.trace_lines)
-    assert "холостий хід M1->A 6" in lines
+    assert "R1      затримка звільнення до 1028.000" in lines
 
 
 @pytest.mark.parametrize("dist,mean,std", [
@@ -64,22 +60,21 @@ def test_uniform_handling_bounds():
 
 
 def _parts_in_system(m: Model) -> int:
-    on_machines = sum(1 for mach in (m.m1, m.m2) for ch in mach.channels if ch.part is not None)
-    carried = sum(1 for r in m.robots if r.task is not None and r.state in ("loaded_move", "wait_slot", "release"))
-    # деталь, що захоплюється, ще лежить на місці-джерелі (у черзі A або ch.part)
-    return m.buffer.length + on_machines + carried
+    return sum(qs.requests for qs in (m.A, m.M1, m.M2, m.W, *m.T.values()))
 
 
 @pytest.mark.parametrize("strategy", STRATEGIES)
-def test_conservation_and_capacity(strategy):
-    p = Params(strategy=strategy)
-    m = Model(p, seed=7)
+def test_conservation_capacity_and_states(strategy):
+    m = Model(Params(strategy=strategy), seed=7)
     checks = []
 
     def observer(model: Model):
         assert model.create.created == model.completed_total + _parts_in_system(model)
-        for mach in (model.m1, model.m2):
-            assert sum(1 for ch in mach.channels if ch.state != FREE) <= mach.capacity
+        for qs in (model.M1, model.M2):
+            assert sum(1 for ch in qs.channels if ch.K != FREE) <= 3
+        for qs in model.stat_qs:
+            assert all(ch.K in (FREE, BUSY, BLOCKED) for ch in qs.channels)
+            assert qs.n == [sum(1 for ch in qs.channels if ch.K == k) for k in (FREE, BUSY, BLOCKED)]
         checks.append(1)
 
     m.run(50_000, observe_every=97.0, observer=observer)
@@ -88,9 +83,8 @@ def test_conservation_and_capacity(strategy):
 
 @pytest.mark.parametrize("strategy", STRATEGIES)
 def test_no_deadlock_under_overload(strategy):
-    # сильне перевантаження: роботи постійно чекають місць, але система не зависає
-    p = Params(strategy=strategy, arrival=exp(15.0))
-    m = Model(p, seed=11)
+    # сильне перевантаження: роботи постійно чекають місць, але система не зупиняється
+    m = Model(Params(strategy=strategy, arrival=exp(15.0)), seed=11)
     done = []
     m.run(100_000, observe_every=5_000.0, observer=lambda mm: done.append(mm.completed_total))
     increments = [b - a for a, b in zip(done, done[1:])]
@@ -103,6 +97,7 @@ def test_dedicated_robots_serve_only_own_route():
         for route in (1, 2, 3):
             jobs = res[f"robot{k}_jobs_route{route}"]
             assert (jobs > 0) if route == k else (jobs == 0)
+    assert [res[f"empty_route{S}_mean"] for S in (1, 2, 3)] == [6.0, 7.0, 5.0]
 
 
 def test_nearest_robots_serve_several_routes():
@@ -110,17 +105,21 @@ def test_nearest_robots_serve_several_routes():
     assert all(sum(res[f"robot{k}_jobs_route{r}"] > 0 for r in (1, 2, 3)) >= 2 for k in (1, 2, 3))
 
 
-@pytest.mark.parametrize("strategy", STRATEGIES)
-def test_at_most_one_extra_robot_per_machine(strategy):
-    # правило u_i <= f_i при призначенні: біля верстата чекає не більше одного робота
-    m = Model(Params(strategy=strategy, arrival=exp(20.0)), seed=2)
+def test_nearest_rule_takes_closest_free_robot():
+    m = Model(Params(strategy=NEAREST), seed=1, trace=True, trace_until=20.0).run(20.0)
+    lines = "\n".join(m.trace_lines)
+    assert "П:R2    холостий хід M1 -> A (6 с)" in lines
+
+
+def test_at_most_one_robot_waits_per_machine():
+    m = Model(Params(strategy=NEAREST, arrival=exp(20.0)), seed=2)
     waits = []
 
     def observer(model: Model):
-        for mach in (model.m1, model.m2):
-            assert mach.incoming <= mach.count(FREE) + 1
-            assert len(mach.waiting_robots) <= 1
-        waits.append(sum(1 for r in model.robots if r.state == R_WAIT))
+        for S in (1, 2):
+            assert model.T[S].n[BLOCKED] <= 1
+            assert model.u(S) <= model.M[S].n[FREE] + 1
+        waits.append(model.T[1].n[BLOCKED] + model.T[2].n[BLOCKED])
 
     m.run(50_000, observe_every=13.0, observer=observer)
     assert max(waits) >= 1  # під перевантаженням роботи справді чекають з деталями
@@ -129,7 +128,7 @@ def test_at_most_one_extra_robot_per_machine(strategy):
 def test_fourth_dedicated_robot_serves_given_route():
     p = Params(strategy=DEDICATED, n_robots=4, dedicated_routes=(1, 2, 3, 3))
     m = Model(p, seed=3)
-    assert [r.location for r in m.robots] == ["A", "M1", "M2", "M2"]
+    assert len(m.T[3].channels) == 2
     res, _ = simulate(p, seed=3, t_end=50_000)
     assert res["robot4_jobs_route3"] > 0
     assert res["robot4_jobs_route1"] == res["robot4_jobs_route2"] == 0
@@ -140,19 +139,22 @@ def test_dedicated_routes_must_cover_all_routes():
         Model(Params(strategy=DEDICATED, n_robots=3, dedicated_routes=(1, 1, 3)), seed=1)
 
 
-def test_light_load_is_stable():
-    res, _ = simulate(Params(arrival=exp(120.0)), seed=4, t_end=200_000, t_warmup=10_000)
+@pytest.mark.parametrize("strategy", STRATEGIES)
+def test_light_load_is_stable(strategy):
+    res, _ = simulate(Params(strategy=strategy, arrival=exp(120.0)), seed=4, t_end=200_000, t_warmup=10_000)
     assert res["wip_end"] < 15
     assert res["throughput_per_hour"] == pytest.approx(30.0, rel=0.07)
 
 
 def test_same_seed_is_reproducible():
-    a, _ = simulate(Params(), seed=9, t_end=20_000)
-    b, _ = simulate(Params(), seed=9, t_end=20_000)
+    a, _ = simulate(Params(strategy=NEAREST), seed=9, t_end=20_000)
+    b, _ = simulate(Params(strategy=NEAREST), seed=9, t_end=20_000)
     assert a == b
 
 
-def test_robot_free_state_at_end_is_consistent():
-    m = Model(Params(strategy=NEAREST), seed=1).run(10_000)
-    for r in m.robots:
-        assert (r.state == R_FREE) == (r.task is None)
+def test_robot_utilization_is_sum_of_phases():
+    res, _ = simulate(Params(strategy=NEAREST), seed=5, t_end=60_000, t_warmup=10_000)
+    for k in (1, 2, 3):
+        phases = sum(res[f"robot{k}_{p}"] for p in ("grab", "loaded_move", "wait_slot", "release", "empty_move"))
+        assert res[f"robot{k}_util"] == pytest.approx(phases)
+        assert 0.0 < res[f"robot{k}_util"] <= 1.0

@@ -30,7 +30,6 @@ def _params(a, strategy=None) -> Params:
 
 
 def _tag(a) -> str:
-    """Позначка інтервалу надходження в іменах файлів результатів, напр. a40."""
     return f"a{a.arrival:g}"
 
 
@@ -48,8 +47,8 @@ def cmd_trace(a):
         m = Model(_params(a, s), seed=a.seed, trace=True, trace_until=a.until).run(a.until)
         path = d / f"trace_{s}.txt"
         header = f"Протокол подій: {m.params.describe()}, seed={a.seed}\n"
-        legend = ("Стан місць верстата: . вільне, l вивільнення робота, "
-                  "B обробка, x блоковане (чекає робота), u захоплення\n")
+        legend = ("Стан: A – кількість зайнятих місць площадки; для пристроїв СМО K = 0 вільний, "
+                  "1 зайнятий, 2 блокований; R@точка – положення робота\n")
         path.write_text(header + legend + "\n".join(m.trace_lines) + "\n", encoding="utf-8")
         print(f"{s}: {len(m.trace_lines)} рядків -> {path}")
         if a.print:

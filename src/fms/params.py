@@ -1,13 +1,12 @@
-"""Вхідні змінні та параметри моделі (усі часи — у секундах)."""
-
 from __future__ import annotations
 
 from dataclasses import dataclass, field, replace
 
 from .rng import Dist, exp, norm, unif
 
-DEDICATED = "dedicated"
-NEAREST = "nearest"
+# Стратегії закріплення роботів
+DEDICATED = "dedicated"  # 1) по одному роботу на кожний шлях переміщення
+NEAREST = "nearest"      # 2) будь-який робот на будь-якому шляху, займається найближчий
 
 DEFAULT_POSITIONS = {"A": 0.0, "M1": 6.0, "M2": 13.0, "W": 18.0}
 
@@ -29,7 +28,6 @@ class Params:
     # варіант організації системи
     strategy: str = DEDICATED
     dedicated_routes: tuple[int, ...] | None = None
-    route_rank: tuple[int, int, int] = (3, 2, 1)
 
     def distance(self, a: str, b: str) -> float:
         return abs(self.positions[a] - self.positions[b])
